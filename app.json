@@ -8,15 +8,30 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "owner": "jay.liang",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jlsoft.MyFirstView",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.aliho.MyFirstView"
+      "androidStatusBar": {
+        "translucent": false,
+        "backgroundColor": "#ffffff",
+        "barStyle": "dark-content"
+      },
+      "androidNavigationBar": {
+        "visible": "leanback",
+        "barStyle": "dark-content",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.jlsoft.MyFirstView"
     },
     "web": {
       "bundler": "metro",
@@ -44,6 +59,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "58799676-11de-4970-b0d7-38464bf79069"
+      }
     }
   }
 }

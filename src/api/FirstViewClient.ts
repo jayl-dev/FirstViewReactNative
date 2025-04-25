@@ -50,6 +50,15 @@ export interface Notification {
     created_at?: string
 }
 
+export function getStudentName(result: Result): string {
+    return result.student?.first_name + ' ' + result.student?.last_name;
+}
+
+export function getStudentId(result: Result): string {
+    const student = result.student;
+    return (student?.id?.toString() || getStudentName(result));
+}
+
 export interface Result {
     period?: string
     pickup_or_dropoff?: string
@@ -235,6 +244,18 @@ export const AuthService = (() => {
         },
     }
 })()
+const mock = (response: EtaResponse): void => {
+    response.result?.forEach((item) => {
+        if (!item.vehicle_location) {
+            const mockLocation: VehicleLocation = {
+                lat: 40.1252448 + Math.random() * 0.01,
+                lng: -75.0385262 + Math.random() * 0.01,
+                bearing: 129 + Math.floor(Math.random() * 100),
+            };
+            item.vehicle_location = mockLocation; // Assign the generated mock location
+        }
+    });
+};
 
 export const FirstViewService = (() => {
     const client = axios.create({ baseURL: BASE_URL })
@@ -245,6 +266,7 @@ export const FirstViewService = (() => {
     return {
         getEta: async (): Promise<EtaResponse> => {
             const { data } = await client.get<EtaResponse>('v1/eta')
+            // mock(data);
             return data
         },
         getNotifications: async (): Promise<NotificationResponse> => {
