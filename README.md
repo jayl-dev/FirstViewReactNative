@@ -14,6 +14,6 @@ The rest is pretty much the same as the official FirstView app, with the followi
 
 ![Map](/../master/screenshots/2.jpg?raw=true "Map")
 
-![Settings](/../master/screenshot/3.jpg?raw=true "Settings")
+![Settings](/../master/screenshots/3.jpg?raw=true "Settings")
 
-![Multitask](/../master/screenshot/4.jpg?raw=true "Multitask")
+![Multitask](/../master/screenshots/4.jpg?raw=true "Multitask")
