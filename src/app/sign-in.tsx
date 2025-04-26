@@ -10,7 +10,7 @@ import {
     Platform,
     TouchableWithoutFeedback,
     Keyboard,
-    ScrollView,
+    ScrollView, Linking,
 } from 'react-native';
 import {AuthContext} from "@/utils/authContext";
 
@@ -66,9 +66,15 @@ export default function SignIn() {
 
                     <View style={styles.instructionsBox}>
                         <Text style={styles.instructionsText}>
-                            MyFirstView uses the same data as the official FirstView bus app. To
-                            use, you must use the official FirstView app to sign up for and
-                            setup an account, then sign into your account here.
+                            MyFirstView taps into the same live data feed as the official FirstView bus app. To get started, please register and set up your account in the official FirstView app, then use those credentials to sign in here.{'\n\n'}
+                            You can download the official FirstView app{' '}
+                            <Text
+                                style={styles.linkText}
+                                onPress={() => Linking.openURL('https://www.firstviewapp.com/')}
+                            >
+                                here
+                            </Text>
+                            .
                         </Text>
                     </View>
                 </ScrollView>
@@ -148,5 +154,9 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         color: '#555',
         textAlign: 'center',
+    },
+    linkText: {
+        color: '#007aff',
+        textDecorationLine: 'underline',
     },
 });

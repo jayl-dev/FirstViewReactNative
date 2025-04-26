@@ -32,11 +32,18 @@ export default function Map() {
     const insets = useSafeAreaInsets();
 
     const [listVisible, setListVisible] = useState(true);
-    const [trackedStudentId, setTrackedStudentId] = useState<string | null>(null);
+    const [trackedStudentIds, setTrackedStudentIds] = useState<string[]>([]);
 
     const toggleTrackStudent = (studentId: string) => {
-        // if clicking the already-tracked student, untrack; otherwise track only this one
-        setTrackedStudentId((prev) => (prev === studentId ? null : studentId));
+        setTrackedStudentIds((prev) => {
+            if (prev.includes(studentId)) {
+                // untrack
+                return prev.filter((id) => id !== studentId);
+            } else {
+                // track
+                return [...prev, studentId];
+            }
+        });
     };
 
 
@@ -89,7 +96,7 @@ export default function Map() {
     const renderStudentItem = ({item: studentId}: ListRenderItemInfo<string>) => {
         const entries = groupedData[studentId];
         const studentColor = getHslColor(getStudentName(entries[0]));
-        const isTracked = studentId === trackedStudentId;
+        const isTracked = trackedStudentIds.includes(studentId);
 
         const onListItemPress = () => {
             adjustZoomToMarkers(mapRef, getAllCoords(entries));
@@ -219,15 +226,14 @@ export default function Map() {
     }, [etaResponse]);
 
     useEffect(() => {
-        if (
-            zoomAdjusted.current &&
-            trackedStudentId &&
-            groupedData[trackedStudentId]
-        ) {
-            const studentEntries = groupedData[trackedStudentId];
-            const studentCoords = getAllCoords(studentEntries);
-            if (studentCoords.length > 0 && mapRef.current) {
-                adjustZoomToMarkers(mapRef, studentCoords);
+        if (zoomAdjusted.current && trackedStudentIds.length > 0) {
+            // collect coords for every tracked student
+            const coords = trackedStudentIds.flatMap((sid) => {
+                const entries = groupedData[sid] || [];
+                return getAllCoords(entries);
+            });
+            if (coords.length > 0 && mapRef.current) {
+                adjustZoomToMarkers(mapRef, coords);
             }
         }
     }, [etaResponse]);
@@ -265,12 +271,6 @@ export default function Map() {
                     (() => {
                         // default button color
                         let buttonColor = 'rgba(0,0,0,0.6)';
-                        // if someone is tracked, override with their HSL color
-                        if (trackedStudentId && groupedData[trackedStudentId]) {
-                            const firstEntry = groupedData[trackedStudentId][0];
-                            const studentName = getStudentName(firstEntry);
-                            buttonColor = getHslColor(studentName);
-                        }
                         return (
                             <TouchableOpacity
                                 style={[
