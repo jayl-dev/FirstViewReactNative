@@ -18,6 +18,7 @@ import {StatusBar} from "expo-status-bar";
 import {useSafeAreaInsets} from "react-native-safe-area-context";
 import {DrawerActions} from "@react-navigation/native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import {Entypo} from "@expo/vector-icons";
 
 
 export default function Map() {
@@ -29,6 +30,14 @@ export default function Map() {
     const zoomAdjusted = useRef(false);
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
+
+    const [listVisible, setListVisible] = useState(true);
+    const [trackedStudentId, setTrackedStudentId] = useState<string | null>(null);
+
+    const toggleTrackStudent = (studentId: string) => {
+        // if clicking the already-tracked student, untrack; otherwise track only this one
+        setTrackedStudentId((prev) => (prev === studentId ? null : studentId));
+    };
 
 
     const fetchEta = async () => {
@@ -46,13 +55,7 @@ export default function Map() {
         return () => clearInterval(interval);
     }, []);
 
-    if (!zoomAdjusted.current && etaResponse) {
-        const coords: Array<{ lat: number; lng: number }> = getAllCoords(etaResponse.result);
-        if (coords.length > 0 && mapRef?.current) {
-            adjustZoomToMarkers(mapRef, coords);
-            zoomAdjusted.current = true;
-        }
-    }
+
 
     const groupedData = useMemo(() => {
         const groups: { [studentId: string]: Result[] } = {};
@@ -85,6 +88,8 @@ export default function Map() {
     };
     const renderStudentItem = ({item: studentId}: ListRenderItemInfo<string>) => {
         const entries = groupedData[studentId];
+        const studentColor = getHslColor(getStudentName(entries[0]));
+        const isTracked = studentId === trackedStudentId;
 
         const onListItemPress = () => {
             adjustZoomToMarkers(mapRef, getAllCoords(entries));
@@ -95,6 +100,10 @@ export default function Map() {
                 adjustZoomToMarkers(mapRef, [{ lat: v.lat, lng: v.lng }]);
             }
         };
+
+        const onTrackToggle = () => {
+            toggleTrackStudent(studentId);
+        };
         return (
             <TouchableOpacity onPress={onListItemPress}>
                 <View style={styles.listItem}>
@@ -103,9 +112,27 @@ export default function Map() {
                     }]}/>
 
                     <View style={styles.studentContainer}>
-                        <Text style={styles.studentName}>
-                            {getStudentName(entries[0])}
-                        </Text>
+                        <View style={styles.studentHeader}>
+                            <Text style={styles.studentName}>
+                                {getStudentName(entries[0])}
+                            </Text>
+                            <TouchableOpacity
+                                onPress={onTrackToggle}
+                                style={[
+                                    styles.trackToggleButton,
+                                    isTracked && { backgroundColor: studentColor },
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.trackToggleText,
+                                        isTracked && styles.trackToggleTextActive,
+                                    ]}
+                                >
+                                    {isTracked ? 'Tracking...' : 'Auto track'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                         {entries.map((entry, idx) => (
                             <View key={idx} style={styles.entryContainer}>
                                 <Text style={styles.entryText}>
@@ -124,7 +151,7 @@ export default function Map() {
                                                     { transform: [{ rotate: '90deg' }] },]}
                                             />
                                             <Text style={[styles.trackBusText, { color:  getHslColor(getStudentName(entry)) }]}>
-                                                Track bus
+                                                Map
                                             </Text>
                                         </View>
                                     </TouchableOpacity>
@@ -138,6 +165,73 @@ export default function Map() {
         );
     };
 
+    const busMarkers = useMemo(() => {
+        return (etaResponse?.result ?? [])
+            .filter((item) => item.vehicle_location)
+            .map((item, i) => {
+                const studentName = getStudentName(item);
+                const tintColor = getHslColor(studentName);
+                return (
+                    <Marker
+                        key={i}
+                        coordinate={{
+                            latitude: item.vehicle_location!.lat,
+                            longitude: item.vehicle_location!.lng,
+                        }}
+                        rotation={item.vehicle_location!.bearing}
+                        anchor={{ x: 0.5, y: 0.5 }}
+                        title={`${studentName} (R${item.route})`}
+                        tracksViewChanges={false}      // keep false once loaded
+                    >
+                        <Image
+                            source={require('../../../../assets/icons/school-bus.png')}
+                            style={[styles.markerImage, { tintColor }]}
+                        />
+                    </Marker>
+                );
+            });
+    }, [etaResponse]);
+
+    const stopMarkers = useMemo(() => {
+        return (etaResponse?.result ?? [])
+            .filter((item) => item.stop)
+            .map((item, i) => (
+                <Marker
+                    key={i}
+                    coordinate={{
+                        latitude: item.stop!.lat,
+                        longitude: item.stop!.lng,
+                    }}
+                    pinColor={getHslColor(getStudentName(item))}
+                    title={item.stop?.name}
+                />
+            ));
+    }, [etaResponse]);
+
+    useEffect(() => {
+        if (!zoomAdjusted.current && etaResponse?.result) {
+            const allCoords = getAllCoords(etaResponse.result);
+            if (allCoords.length > 0 && mapRef.current) {
+                adjustZoomToMarkers(mapRef, allCoords);
+                zoomAdjusted.current = true;
+            }
+        }
+    }, [etaResponse]);
+
+    useEffect(() => {
+        if (
+            zoomAdjusted.current &&
+            trackedStudentId &&
+            groupedData[trackedStudentId]
+        ) {
+            const studentEntries = groupedData[trackedStudentId];
+            const studentCoords = getAllCoords(studentEntries);
+            if (studentCoords.length > 0 && mapRef.current) {
+                adjustZoomToMarkers(mapRef, studentCoords);
+            }
+        }
+    }, [etaResponse]);
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" backgroundColor="#ffffff"/>
@@ -145,49 +239,51 @@ export default function Map() {
                 <MapView
                     ref={mapRef}
                     style={styles.map} initialRegion={initialRegion}>
-                    {(etaResponse?.result ?? [])
-                        .filter((item: Result) => item.vehicle_location)
-                        .map((item: Result, index: number) => (
-                            <Marker
-                                key={`${index}`}
-                                coordinate={{
-                                    latitude: item.vehicle_location?.lat ?? 0,
-                                    longitude: item.vehicle_location?.lng ?? 0,
-                                }}
-                                rotation={item.vehicle_location?.bearing ?? 0}
-                                anchor={{x: 0.5, y: 0.5}}
-                                title={`${getStudentName(item)} (R${item.route})`}
-                            >
-                                <Image
-                                    source={require('../../../../assets/icons/school-bus.png')}
-                                    style={[styles.markerImage, {tintColor: getHslColor(getStudentName(item))}]}
-                                />
-                            </Marker>
-                        ))}
-
-                    {/* Stop markers for each stop */}
-                    {(etaResponse?.result ?? [])
-                        .filter((item: Result) => item.stop)
-                        .map((item: Result, index: number) => (
-                            <Marker
-                                key={`${index}`}
-                                coordinate={{
-                                    latitude: item.stop?.lat ?? 0,
-                                    longitude: item.stop?.lng ?? 0,
-                                }}
-                                pinColor={getHslColor(getStudentName(item))}
-                                title={item.stop?.name}
-                            />
-                        ))}
+                    {busMarkers}
+                    {stopMarkers}
                 </MapView>
 
-                {/* List view grouped by student */}
-                <FlatList
-                    style={styles.list}
-                    data={Object.keys(groupedData)}
-                    keyExtractor={(studentId) => studentId}
-                    renderItem={renderStudentItem}          // <-- use the extracted function
-                />
+                {listVisible && (
+                    <View style={styles.listWrapper}>
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={() => setListVisible(false)}
+                        >
+                            <MaterialIcons name="close" size={24} color="#333" />
+                        </TouchableOpacity>
+
+                        <FlatList
+                            style={styles.list}
+                            data={Object.keys(groupedData)}
+                            keyExtractor={(studentId) => studentId}
+                            renderItem={renderStudentItem}
+                        />
+                    </View>
+                )}
+
+                {!listVisible && (
+                    (() => {
+                        // default button color
+                        let buttonColor = 'rgba(0,0,0,0.6)';
+                        // if someone is tracked, override with their HSL color
+                        if (trackedStudentId && groupedData[trackedStudentId]) {
+                            const firstEntry = groupedData[trackedStudentId][0];
+                            const studentName = getStudentName(firstEntry);
+                            buttonColor = getHslColor(studentName);
+                        }
+                        return (
+                            <TouchableOpacity
+                                style={[
+                                    styles.showListButton,
+                                    { backgroundColor: buttonColor },
+                                ]}
+                                onPress={() => setListVisible(true)}
+                            >
+                                <Entypo name="chevron-up" size={24} color="#fff" />
+                            </TouchableOpacity>
+                        );
+                    })()
+                )}
                 <TouchableOpacity
                     onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
                     style={[
@@ -303,7 +399,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         left: 10,
         padding: 8,
-        backgroundColor: 'white',
+        backgroundColor: '#ffffffdd',
         borderRadius: 20,
     },
     rightButton: {
@@ -380,5 +476,47 @@ const styles = StyleSheet.create({
     trackBusText: {
         fontSize: 14,
         fontWeight: '500',
+    },
+
+    showListButton: {
+        position: 'absolute',
+        bottom: 20,           // move to bottom
+        right: 6,            // keep it on the right
+        zIndex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        borderRadius: 20,
+        padding: 8,
+    },
+    listWrapper: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+
+    closeButton: {
+        position: 'absolute',
+        right: 3,
+        zIndex: 1,
+        padding: 4,
+    },
+    studentHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,         // space below header
+    },
+    trackToggleButton: {
+        marginLeft: 12,          // space to the left of the button
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#ccc',
+    },
+    trackToggleText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+    },
+    trackToggleTextActive: {
+        color: '#fff',
     },
 });
