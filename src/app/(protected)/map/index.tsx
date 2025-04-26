@@ -244,7 +244,10 @@ export default function Map() {
             <View style={styles.container}>
                 <MapView
                     ref={mapRef}
-                    style={styles.map} initialRegion={initialRegion}>
+                    style={[
+                        styles.map,
+                        {top: insets.top}
+                    ]} initialRegion={initialRegion}>
                     {busMarkers}
                     {stopMarkers}
                 </MapView>
