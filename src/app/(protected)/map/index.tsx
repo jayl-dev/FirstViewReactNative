@@ -10,7 +10,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native'
-import {useNavigation} from 'expo-router'
+import {useFocusEffect, useNavigation} from 'expo-router'
 import MapView, {LatLng, Marker, Region} from 'react-native-maps';
 import {EtaResponse, FirstViewService, getStudentId, getStudentName, Result} from "@/api/FirstViewClient";
 import {getHslColor} from "@/ui/Color";
@@ -18,12 +18,13 @@ import {StatusBar} from "expo-status-bar";
 import {useSafeAreaInsets} from "react-native-safe-area-context";
 import {DrawerActions} from "@react-navigation/native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import {Entypo} from "@expo/vector-icons";
-
+import {Entypo, MaterialCommunityIcons} from "@expo/vector-icons";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {HOME_LAT_KEY, HOME_LNG_KEY, HOME_MARKER_KEY, KEEP_SCREEN_ON_KEY} from "@/app/(protected)/settings";
 
 export default function Map() {
     const mapRef = useRef<MapView | null>(null);
-    const [showHome, setShowHome] = useState(false); //todo
 
     const [etaResponse, setEtaResponse] = useState<EtaResponse | null>(null);
 
@@ -33,6 +34,39 @@ export default function Map() {
 
     const [listVisible, setListVisible] = useState(true);
     const [trackedStudentIds, setTrackedStudentIds] = useState<string[]>([]);
+    const [homeMarkerEnabled, setHomeMarkerEnabled] = useState(false);
+    const [homeLat, setHomeLat] = useState<number | null>(null);
+    const [homeLng, setHomeLng] = useState<number | null>(null);
+    const loadPreferences = async () => {
+        try {
+            const keep = await AsyncStorage.getItem(KEEP_SCREEN_ON_KEY);
+            if (keep === 'true') {
+                await activateKeepAwakeAsync();
+            } else {
+                deactivateKeepAwake();
+            }
+            const marker = await AsyncStorage.getItem(HOME_MARKER_KEY);
+            setHomeMarkerEnabled(marker === 'true');
+            const lat = await AsyncStorage.getItem(HOME_LAT_KEY);
+            const lng = await AsyncStorage.getItem(HOME_LNG_KEY);
+            setHomeLat(lat ? JSON.parse(lat) : null);
+            setHomeLng(lng ? JSON.parse(lng) : null);
+        } catch (e) {
+            console.warn('Error reading preferences', e);
+        }
+    };
+
+    useEffect(() => {
+        loadPreferences();
+        return () => {
+            deactivateKeepAwake();
+        };
+    }, []);
+    useFocusEffect(
+        React.useCallback(() => {
+            loadPreferences();
+        }, [])
+    );
 
     const toggleTrackStudent = (studentId: string) => {
         setTrackedStudentIds((prev) => {
@@ -215,6 +249,18 @@ export default function Map() {
             ));
     }, [etaResponse]);
 
+    const homeMarker =
+        homeMarkerEnabled && homeLat != null && homeLng != null ? (
+            <Marker
+                coordinate={{ latitude: homeLat, longitude: homeLng }}
+                tracksViewChanges={false}
+            >
+                <View style={styles.homeMarker}>
+                    <MaterialCommunityIcons name="home-map-marker" size={24} color="#005EB8" />
+                </View>
+            </Marker>
+        ) : null;
+
     useEffect(() => {
         if (!zoomAdjusted.current && etaResponse?.result) {
             const allCoords = getAllCoords(etaResponse.result);
@@ -250,6 +296,7 @@ export default function Map() {
                     ]} initialRegion={initialRegion}>
                     {busMarkers}
                     {stopMarkers}
+                    {homeMarker}
                 </MapView>
 
                 {listVisible && (
@@ -521,5 +568,17 @@ const styles = StyleSheet.create({
     },
     trackToggleTextActive: {
         color: '#fff',
+    },
+    homeMarker: {
+        backgroundColor: 'white',
+        padding: 3,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 5, // Android shadow
+        shadowColor: '#000', // iOS shadow
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
     },
 });
