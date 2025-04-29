@@ -65,8 +65,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "58799676-11de-4970-b0d7-38464bf79069"
-      }
+        "projectId": "ID"
+      },
+      "GEOCODING_API_KEY": "APIKEY"
     }
   }
 }
